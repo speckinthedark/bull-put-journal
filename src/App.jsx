@@ -10,9 +10,10 @@ import Sidebar from './components/ui/Sidebar';
 // View Components
 import OverviewView from './components/views/OverviewView';
 import OngoingTradesView from './components/views/OngoingTradesView';
-
-// Import existing components (to be refactored later)
-import { NewTradeView, ExitTradeView, DeleteTradeView, DocumentationView } from './components/LegacyComponents';
+import NewTradeView from './components/views/NewTradeView';
+import ExitTradeView from './components/views/ExitTradeView';
+import DeleteTradeView from './components/views/DeleteTradeView';
+import DocumentationView from './components/views/DocumentationView';
 
 export default function App() {
     const [currentView, setCurrentView] = useState('overview');
