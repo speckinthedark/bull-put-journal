@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ChevronDown, PlusCircle, BookOpen, LogOut, TrendingUp, TrendingDown, Calendar, DollarSign, Target, CheckCircle, Circle, AlertTriangle, Trash2, HelpCircle, ExternalLink } from 'lucide-react';
+import { ChevronDown, PlusCircle, BookOpen, LogOut, TrendingUp, TrendingDown, Calendar, DollarSign, Target, CheckCircle, Circle, AlertTriangle, Trash2, HelpCircle, ExternalLink, Save, Layout, Filter } from 'lucide-react';
 import { db, auth, appId, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from './firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, query, deleteDoc } from 'firebase/firestore'; // Keep this one
+import { collection, addDoc, onSnapshot, doc, updateDoc, query, deleteDoc } from 'firebase/firestore';
+import PriceService from './services/priceService';
+import TemplateService from './services/templateService';
 
 // --- Helper Functions ---
 const calculateDTE = (expirationDate) => {
@@ -43,6 +45,10 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+
+    // Initialize services
+    const priceService = useMemo(() => new PriceService('E2XDV7Q58NWTY3KG'), []);
+    const templateService = useMemo(() => new TemplateService(), []);
 
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -134,9 +140,9 @@ export default function App() {
         }
         switch (currentView) {
             case 'newTrade':
-                return <NewTradeView addTrade={addTrade} setCurrentView={setCurrentView} />;
+                return <NewTradeView addTrade={addTrade} setCurrentView={setCurrentView} priceService={priceService} templateService={templateService} />;
             case 'ongoing':
-                return <OngoingTradesView trades={trades} />;
+                return <OngoingTradesView trades={trades} updateTrade={updateTrade} />;
             case 'exitTrade':
                 return <ExitTradeView trades={trades} updateTrade={updateTrade} />;
             case 'deleteTrade':
@@ -312,6 +318,7 @@ const OverviewView = ({ trades }) => {
                             <thead>
                                 <tr className="border-b border-gray-600 text-gray-400">
                                     <th className="p-2">Ticker</th>
+                                    <th className="p-2">Strikes</th>
                                     <th className="p-2">Exit Date</th>
                                     <th className="p-2">Outcome</th>
                                     <th className="p-2 text-right">P/L</th>
@@ -321,6 +328,9 @@ const OverviewView = ({ trades }) => {
                                 {filteredTrades.length > 0 ? filteredTrades.map(trade => (
                                     <tr key={trade.id} className="border-b border-gray-700">
                                         <td className="p-2 font-mono">{trade.ticker}</td>
+                                        <td className="p-2 font-mono text-sm text-gray-300">
+                                            {trade.shortStrike}/{trade.longStrike}
+                                        </td>
                                         <td className="p-2">{trade.exitDate}</td>
                                         <td className="p-2">
                                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${trade.status === 'profit' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
@@ -333,7 +343,7 @@ const OverviewView = ({ trades }) => {
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan="4" className="text-center p-4 text-gray-500">No trades to display.</td>
+                                        <td colSpan="5" className="text-center p-4 text-gray-500">No trades to display.</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -355,7 +365,7 @@ const StatCard = ({ title, value, isPositive }) => (
 );
 
 // --- New Trade View Component ---
-const NewTradeView = ({ addTrade, setCurrentView }) => {
+const NewTradeView = ({ addTrade, setCurrentView, priceService, templateService }) => {
     const [trade, setTrade] = useState({
         ticker: '',
         entryDate: new Date().toISOString().slice(0, 10),
@@ -521,15 +531,37 @@ const Checklist = ({ title, items, checkedItems, onCheck, disabled, setCurrentVi
 
 
 // --- Ongoing Trades View Component ---
-const OngoingTradesView = ({ trades }) => {
-    const ongoingTrades = trades.filter(t => t.status === 'ongoing');
+const OngoingTradesView = ({ trades, updateTrade }) => {
+    const ongoingTrades = trades
+        .filter(t => t.status === 'ongoing')
+        .sort((a, b) => {
+            // Sort by DTE ascending (closest to expiry first)
+            const dteA = calculateDTE(a.expirationDate) || 999;
+            const dteB = calculateDTE(b.expirationDate) || 999;
+            return dteA - dteB;
+        });
 
     return (
         <div>
-            <h2 className="text-3xl font-bold text-white mb-6">Ongoing Trades</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold text-white">Ongoing Trades</h2>
+                {ongoingTrades.length > 0 && (
+                    <div className="text-sm text-gray-400 flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Sorted by expiration (closest first)
+                    </div>
+                )}
+            </div>
             {ongoingTrades.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {ongoingTrades.map(trade => <TradeCard key={trade.id} trade={trade} />)}
+                    {ongoingTrades.map(trade => 
+                        <TradeCard 
+                            key={trade.id} 
+                            trade={trade} 
+                            updateTrade={updateTrade}
+                            showExitButton={true}
+                        />
+                    )}
                 </div>
             ) : (
                 <div className="text-center py-16 bg-gray-800 rounded-lg">
@@ -540,40 +572,277 @@ const OngoingTradesView = ({ trades }) => {
     );
 };
 
-const TradeCard = ({ trade }) => {
+const TradeCard = ({ trade, updateTrade, showExitButton = false }) => {
+    const [showExitModal, setShowExitModal] = useState(false);
+    const [exitDetails, setExitDetails] = useState({
+        status: 'profit',
+        finalPL: '',
+        exitDate: new Date().toISOString().slice(0, 10)
+    });
+
     const dte = calculateDTE(trade.expirationDate);
     const isGammaRisk = dte !== null && dte <= 21;
 
+    const handleExitClick = () => {
+        // Pre-populate with 50% of max profit as default
+        const fiftyPercentProfit = trade.maxProfit * 0.5;
+        setExitDetails(prev => ({
+            ...prev,
+            status: 'profit',
+            finalPL: fiftyPercentProfit.toFixed(2)
+        }));
+        setShowExitModal(true);
+    };
+
+    const handleStatusChange = (newStatus) => {
+        let defaultAmount = '';
+        if (newStatus === 'profit') {
+            // Default to 50% of max profit
+            defaultAmount = (trade.maxProfit * 0.5).toFixed(2);
+        } else {
+            // Default to 100% of max loss for loss scenario
+            defaultAmount = trade.maxLoss.toFixed(2);
+        }
+        
+        setExitDetails({
+            ...exitDetails,
+            status: newStatus,
+            finalPL: defaultAmount
+        });
+    };
+
+    const handleExitSubmit = () => {
+        if (!exitDetails.finalPL) return;
+        
+        // Parse the absolute value of the input
+        let finalPL = Math.abs(parseFloat(exitDetails.finalPL));
+        
+        // If status is 'loss', make the P/L negative
+        if (exitDetails.status === 'loss') {
+            finalPL = -finalPL;
+        }
+        
+        updateTrade(trade.id, {
+            ...exitDetails,
+            finalPL: finalPL,
+        });
+        setShowExitModal(false);
+    };
+
     return (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
-            <div className="flex justify-between items-start">
-                <h3 className="text-2xl font-bold font-mono">{trade.ticker}</h3>
-                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-semibold ${isGammaRisk ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-300'}`}>
-                    {isGammaRisk && <AlertTriangle className="h-4 w-4 mr-2" />}
-                    {dte} DTE
+        <>
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
+                <div className="flex justify-between items-start">
+                    <h3 className="text-2xl font-bold font-mono">{trade.ticker}</h3>
+                    <DTECircularProgress dte={dte} isGammaRisk={isGammaRisk} />
                 </div>
+                <div className="text-sm text-gray-400">
+                    <p>Entry: {trade.entryDate}</p>
+                    <p>Expiry: {trade.expirationDate}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-center pt-2">
+                    <div>
+                        <p className="text-xs text-gray-500">Strikes</p>
+                        <p className="font-semibold text-lg">{trade.shortStrike} / {trade.longStrike}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Breakeven</p>
+                        <p className="font-semibold text-lg">${trade.breakeven.toFixed(2)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Max Profit</p>
+                        <p className="font-semibold text-lg text-green-400">${trade.maxProfit.toFixed(2)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Max Loss</p>
+                        <p className="font-semibold text-lg text-red-400">${trade.maxLoss.toFixed(2)}</p>
+                    </div>
+                </div>
+                
+                {showExitButton && (
+                    <div className="pt-2 border-t border-gray-600">
+                        <button
+                            onClick={handleExitClick}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                        >
+                            <LogOut className="h-4 w-4 mr-2" />
+                            Exit Trade
+                        </button>
+                    </div>
+                )}
             </div>
-            <div className="text-sm text-gray-400">
-                <p>Entry: {trade.entryDate}</p>
-                <p>Expiry: {trade.expirationDate}</p>
+
+            {/* Exit Trade Modal */}
+            {showExitModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                        <h3 className="text-xl font-bold text-white mb-4">
+                            Exit Trade: {trade.ticker} {trade.shortStrike}/{trade.longStrike}P
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Outcome</label>
+                                <div className="flex space-x-4">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleStatusChange('profit')} 
+                                        className={`flex-1 py-2 rounded-md transition-colors ${exitDetails.status === 'profit' ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
+                                    >
+                                        Profit
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleStatusChange('loss')} 
+                                        className={`flex-1 py-2 rounded-md transition-colors ${exitDetails.status === 'loss' ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
+                                    >
+                                        Loss
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Final P/L
+                                    <span className="text-xs text-gray-500 ml-2">
+                                        (Enter positive amount - sign will be applied automatically)
+                                    </span>
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={exitDetails.finalPL}
+                                        onChange={(e) => setExitDetails({...exitDetails, finalPL: e.target.value})}
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter amount (e.g., 150.00)"
+                                    />
+                                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm font-medium">
+                                        <span className={exitDetails.status === 'profit' ? 'text-green-400' : 'text-red-400'}>
+                                            {exitDetails.status === 'profit' ? '+' : '-'}${Math.abs(parseFloat(exitDetails.finalPL) || 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                                {exitDetails.status === 'loss' && (
+                                    <p className="text-xs text-red-400 mt-1">
+                                        This will be recorded as a loss of ${Math.abs(parseFloat(exitDetails.finalPL) || 0).toFixed(2)}
+                                    </p>
+                                )}
+                                {exitDetails.status === 'profit' && (
+                                    <p className="text-xs text-green-400 mt-1">
+                                        This will be recorded as a profit of ${Math.abs(parseFloat(exitDetails.finalPL) || 0).toFixed(2)}
+                                    </p>
+                                )}
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Exit Date</label>
+                                <input
+                                    type="date"
+                                    value={exitDetails.exitDate}
+                                    onChange={(e) => setExitDetails({...exitDetails, exitDate: e.target.value})}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    onClick={() => setShowExitModal(false)}
+                                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleExitSubmit}
+                                    disabled={!exitDetails.finalPL}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                                >
+                                    Confirm Exit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
+// --- Circular Progress Component for DTE ---
+const DTECircularProgress = ({ dte, isGammaRisk }) => {
+    // Calculate progress based on assumption that typical trades are 30-45 DTE
+    // Progress decreases as time passes (fewer days remaining = more progress)
+    const maxDTE = 45; // Maximum expected DTE for new trades
+    const progress = dte !== null ? Math.max(0, Math.min(100, ((maxDTE - dte) / maxDTE) * 100)) : 0;
+    
+    // Circle parameters
+    const size = 60;
+    const strokeWidth = 4;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const strokeDasharray = circumference;
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+    
+    // Color based on risk level
+    const getColor = () => {
+        if (dte === null) return '#6B7280'; // gray-500
+        if (isGammaRisk) return '#F59E0B'; // yellow-500 (gamma risk)
+        if (dte <= 30) return '#EF4444'; // red-500 (high time decay)
+        if (dte <= 35) return '#F97316'; // orange-500 (medium time decay)
+        return '#10B981'; // green-500 (low time decay)
+    };
+
+    const getTooltipText = () => {
+        if (dte === null) return 'No expiration date set';
+        if (isGammaRisk) return `⚠️ Gamma risk zone! ${dte} days until expiration - consider closing`;
+        if (dte <= 30) return `High time decay: ${dte} days remaining`;
+        if (dte <= 35) return `Moderate time decay: ${dte} days remaining`;
+        return `Low time decay: ${dte} days remaining`;
+    };
+
+    return (
+        <div className="relative flex items-center justify-center group">
+            <svg width={size} height={size} className="transform -rotate-90">
+                {/* Background circle */}
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke="#374151"
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                />
+                {/* Progress circle */}
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke={getColor()}
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                    strokeDasharray={strokeDasharray}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    className="transition-all duration-300 ease-in-out"
+                />
+            </svg>
+            {/* DTE text overlay */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-xs font-bold ${isGammaRisk ? 'text-yellow-400' : 'text-gray-300'}`}>
+                    {dte || 0}
+                </span>
+                <span className={`text-xs ${isGammaRisk ? 'text-yellow-400' : 'text-gray-500'}`}>
+                    DTE
+                </span>
+                {isGammaRisk && (
+                    <AlertTriangle className="h-3 w-3 text-yellow-400 mt-0.5" />
+                )}
             </div>
-            <div className="grid grid-cols-2 gap-4 text-center pt-2">
-                <div>
-                    <p className="text-xs text-gray-500">Strikes</p>
-                    <p className="font-semibold text-lg">{trade.shortStrike} / {trade.longStrike}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-gray-500">Breakeven</p>
-                    <p className="font-semibold text-lg">${trade.breakeven.toFixed(2)}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-gray-500">Max Profit</p>
-                    <p className="font-semibold text-lg text-green-400">${trade.maxProfit.toFixed(2)}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-gray-500">Max Loss</p>
-                    <p className="font-semibold text-lg text-red-400">${trade.maxLoss.toFixed(2)}</p>
-                </div>
+            {/* Tooltip */}
+            <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                {getTooltipText()}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
             </div>
         </div>
     );

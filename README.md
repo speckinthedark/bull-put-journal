@@ -130,6 +130,11 @@ You need a free Firebase project to act as your backend.
     export { db, auth, appId, signInAnonymously, onAuthStateChanged, signInWithCustomToken };
     ```
 
+3.  **Configure Alpha Vantage API** (for enhanced features):
+    - Get a free API key from [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+    - In `src/App.jsx`, replace `REPLACE_WITH_YOUR_ALPHA_VANTAGE_API_KEY` on line 48 with your actual API key
+    - This enables real-time price display and enhanced trade analysis features
+
 ### 5. Run the Application
 
 You're all set! Start the local development server by running:
