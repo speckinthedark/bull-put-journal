@@ -8,17 +8,18 @@ import { useTrades } from './hooks/useTrades';
 import Sidebar from './components/ui/Sidebar';
 
 // View Components
-import OverviewView from './components/views/OverviewView';
+import AccountOverviewView from './components/views/AccountOverviewView';
+import TradePerformanceView from './components/views/TradePerformanceView';
 import OngoingTradesView from './components/views/OngoingTradesView';
 import NewTradeView from './components/views/NewTradeView';
 import DeleteTradeView from './components/views/DeleteTradeView';
 import DocumentationView from './components/views/DocumentationView';
 
 export default function App() {
-    const [currentView, setCurrentView] = useState('overview');
+    const [currentView, setCurrentView] = useState('account-overview');
     
     // Custom hooks for data management
-    const { userId, isAuthReady } = useAuth();
+    const { userId, user, isAuthReady } = useAuth();
     const { trades, isLoading, addTrade, updateTrade, deleteTrade } = useTrades(userId, isAuthReady);
 
     // Initialize services
@@ -37,7 +38,7 @@ export default function App() {
     const handleUpdateTrade = async (tradeId, updateData) => {
         try {
             await updateTrade(tradeId, updateData);
-            setCurrentView('overview');
+            setCurrentView('trade-performance');
         } catch (error) {
             console.error("Error updating trade:", error);
         }
@@ -46,7 +47,7 @@ export default function App() {
     const handleDeleteTrade = async (tradeId) => {
         try {
             await deleteTrade(tradeId);
-            setCurrentView('overview');
+            setCurrentView('trade-performance');
         } catch (error) {
             console.error("Error deleting trade:", error);
         }
@@ -62,6 +63,10 @@ export default function App() {
         }
 
         switch (currentView) {
+            case 'account-overview':
+                return <AccountOverviewView trades={trades} user={user} />;
+            case 'trade-performance':
+                return <TradePerformanceView trades={trades} />;
             case 'newTrade':
                 return (
                     <NewTradeView 
@@ -81,9 +86,8 @@ export default function App() {
                 return <DeleteTradeView trades={trades} deleteTrade={handleDeleteTrade} />;
             case 'documentation':
                 return <DocumentationView />;
-            case 'overview':
             default:
-                return <OverviewView trades={trades} />;
+                return <AccountOverviewView trades={trades} user={user} />;
         }
     };
 
