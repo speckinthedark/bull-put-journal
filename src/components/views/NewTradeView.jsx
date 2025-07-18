@@ -1,9 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { CheckCircle, Circle, HelpCircle } from 'lucide-react';
+import { CheckCircle, Circle, HelpCircle, CheckSquare, Square } from 'lucide-react';
 import { entryChecklistItems, macroChecklistItems } from '../../constants/checklists';
 import InputField from '../ui/InputField';
 
-const Checklist = ({ title, items, checkedItems, onCheck, disabled, setCurrentView }) => {
+const Checklist = ({ title, items, checkedItems, onCheck, onSelectAll, disabled, setCurrentView }) => {
+    const allSelected = Object.keys(items).every(item => checkedItems[item]);
+    const someSelected = Object.keys(items).some(item => checkedItems[item]);
+
     const handleHelpClick = (section) => {
         setCurrentView('documentation');
         // Small delay to ensure the view renders before scrolling
@@ -17,7 +20,29 @@ const Checklist = ({ title, items, checkedItems, onCheck, disabled, setCurrentVi
 
     return (
         <div className={`bg-gray-800 p-6 rounded-lg shadow-lg ${disabled ? 'opacity-50' : ''}`}>
-            <h3 className="text-xl font-semibold mb-4">{title}</h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">{title}</h3>
+                <button
+                    type="button"
+                    onClick={() => onSelectAll()}
+                    disabled={disabled}
+                    className={`flex items-center space-x-2 px-3 py-1 rounded text-sm font-medium transition-colors duration-200 ${
+                        disabled 
+                            ? 'cursor-not-allowed text-gray-500' 
+                            : allSelected 
+                                ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-900/20' 
+                                : 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/20'
+                    }`}
+                    title={allSelected ? "Deselect all items" : "Select all items"}
+                >
+                    {allSelected ? (
+                        <CheckSquare className="h-4 w-4" />
+                    ) : (
+                        <Square className="h-4 w-4" />
+                    )}
+                    <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
+                </button>
+            </div>
             <div className="space-y-3">
                 {Object.entries(items).map(([item, section]) => (
                     <div key={item} className="flex items-center justify-between">
@@ -82,6 +107,18 @@ export default function NewTradeView({ addTrade, setCurrentView, priceService, t
         }));
     };
 
+    const handleSelectAll = (list, items) => {
+        const allSelected = Object.keys(items).every(item => checklists[list][item]);
+        const newState = {};
+        Object.keys(items).forEach(item => {
+            newState[item] = !allSelected;
+        });
+        setChecklists(prev => ({
+            ...prev,
+            [list]: newState
+        }));
+    };
+
     const allChecked = useMemo(() => {
         const macroAllChecked = Object.keys(macroChecklistItems).every(item => checklists.macro[item]);
         const entryAllChecked = Object.keys(entryChecklistItems).every(item => checklists.entry[item]);
@@ -142,8 +179,24 @@ export default function NewTradeView({ addTrade, setCurrentView, priceService, t
                 </div>
 
                 <div className="space-y-6">
-                    <Checklist title="Macro & Underlying Checklist" items={macroChecklistItems} checkedItems={checklists.macro} onCheck={(item) => handleCheck('macro', item)} disabled={!isFormValid} setCurrentView={setCurrentView} />
-                    <Checklist title="Trade Entry Rules Checklist" items={entryChecklistItems} checkedItems={checklists.entry} onCheck={(item) => handleCheck('entry', item)} disabled={!isFormValid} setCurrentView={setCurrentView} />
+                    <Checklist 
+                        title="Macro & Underlying Checklist" 
+                        items={macroChecklistItems} 
+                        checkedItems={checklists.macro} 
+                        onCheck={(item) => handleCheck('macro', item)} 
+                        onSelectAll={() => handleSelectAll('macro', macroChecklistItems)}
+                        disabled={!isFormValid} 
+                        setCurrentView={setCurrentView} 
+                    />
+                    <Checklist 
+                        title="Trade Entry Rules Checklist" 
+                        items={entryChecklistItems} 
+                        checkedItems={checklists.entry} 
+                        onCheck={(item) => handleCheck('entry', item)} 
+                        onSelectAll={() => handleSelectAll('entry', entryChecklistItems)}
+                        disabled={!isFormValid} 
+                        setCurrentView={setCurrentView} 
+                    />
                 </div>
                 
                 <div className="lg:col-span-2">

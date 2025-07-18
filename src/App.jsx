@@ -11,7 +11,6 @@ import Sidebar from './components/ui/Sidebar';
 import OverviewView from './components/views/OverviewView';
 import OngoingTradesView from './components/views/OngoingTradesView';
 import NewTradeView from './components/views/NewTradeView';
-import ExitTradeView from './components/views/ExitTradeView';
 import DeleteTradeView from './components/views/DeleteTradeView';
 import DocumentationView from './components/views/DocumentationView';
 
@@ -75,7 +74,9 @@ export default function App() {
             case 'ongoing':
                 return <OngoingTradesView trades={trades} updateTrade={handleUpdateTrade} />;
             case 'exitTrade':
-                return <ExitTradeView trades={trades} updateTrade={handleUpdateTrade} />;
+                // Redirect to ongoing trades since exit functionality is now integrated there
+                setCurrentView('ongoing');
+                return <OngoingTradesView trades={trades} updateTrade={handleUpdateTrade} />;
             case 'deleteTrade':
                 return <DeleteTradeView trades={trades} deleteTrade={handleDeleteTrade} />;
             case 'documentation':

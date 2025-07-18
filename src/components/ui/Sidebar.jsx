@@ -1,12 +1,11 @@
 import React from 'react';
-import { BookOpen, PlusCircle, TrendingUp, LogOut, Trash2, HelpCircle, Target } from 'lucide-react';
+import { BookOpen, PlusCircle, TrendingUp, Trash2, HelpCircle, Target } from 'lucide-react';
 
 const Sidebar = ({ currentView, setCurrentView, userId }) => {
     const navItems = [
         { id: 'overview', label: 'Overview', icon: BookOpen },
         { id: 'newTrade', label: 'New Trade', icon: PlusCircle },
         { id: 'ongoing', label: 'Ongoing Trades', icon: TrendingUp },
-        { id: 'exitTrade', label: 'Exit a Trade', icon: LogOut },
         { id: 'deleteTrade', label: 'Delete a Trade', icon: Trash2 },
     ];
 
