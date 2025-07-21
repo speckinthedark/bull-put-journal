@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 // YOUR FIREBASE CONFIGURATION
 const firebaseConfig = {
@@ -18,4 +18,4 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = firebaseConfig.appId; // Use appId from your config
 
-export { db, auth, appId, signInAnonymously, onAuthStateChanged, signInWithCustomToken };
+export { db, auth, appId, signInAnonymously, onAuthStateChanged, signInWithCustomToken, doc, getDoc, setDoc, updateDoc, arrayUnion };

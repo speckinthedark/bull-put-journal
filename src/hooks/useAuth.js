@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { auth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, db, doc, getDoc, setDoc } from '../firebase';
 
 /**
  * Custom hook for Firebase authentication and user data

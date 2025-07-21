@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Minus, TrendingUp, DollarSign, Calendar } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../firebase';
 
 const AccountOverviewView = ({ trades, user }) => {
     const [accountBalance, setAccountBalance] = useState(10000); // Default starting balance
@@ -12,15 +10,18 @@ const AccountOverviewView = ({ trades, user }) => {
     const [withdrawalAmount, setWithdrawalAmount] = useState('');
     const [accountHistory, setAccountHistory] = useState([]);
 
-    // Load account data from user profile
+    // Load account data from localStorage
     useEffect(() => {
-        if (user?.accountBalance !== undefined) {
-            setAccountBalance(user.accountBalance);
+        const savedBalance = localStorage.getItem('accountBalance');
+        const savedHistory = localStorage.getItem('accountHistory');
+        
+        if (savedBalance) {
+            setAccountBalance(parseFloat(savedBalance));
         }
-        if (user?.accountHistory) {
-            setAccountHistory(user.accountHistory);
+        if (savedHistory) {
+            setAccountHistory(JSON.parse(savedHistory));
         }
-    }, [user]);
+    }, []);
 
     // Calculate account balance history including trades
     const balanceHistory = useMemo(() => {
@@ -73,7 +74,7 @@ const AccountOverviewView = ({ trades, user }) => {
         return { events, chartData };
     }, [trades, accountHistory]);
 
-    const handleContribution = async () => {
+    const handleContribution = () => {
         const amount = parseFloat(contributionAmount);
         if (!amount || amount <= 0) return;
 
@@ -88,11 +89,9 @@ const AccountOverviewView = ({ trades, user }) => {
             const newBalance = accountBalance + amount;
             const newHistory = [...accountHistory, newEntry];
 
-            // Update Firestore
-            await updateDoc(doc(db, 'users', user.uid), {
-                accountBalance: newBalance,
-                accountHistory: arrayUnion(newEntry)
-            });
+            // Save to localStorage
+            localStorage.setItem('accountBalance', newBalance.toString());
+            localStorage.setItem('accountHistory', JSON.stringify(newHistory));
 
             setAccountBalance(newBalance);
             setAccountHistory(newHistory);
@@ -100,10 +99,11 @@ const AccountOverviewView = ({ trades, user }) => {
             setShowContributionModal(false);
         } catch (error) {
             console.error('Error adding contribution:', error);
+            alert('Error adding contribution: ' + error.message);
         }
     };
 
-    const handleWithdrawal = async () => {
+    const handleWithdrawal = () => {
         const amount = parseFloat(withdrawalAmount);
         if (!amount || amount <= 0 || amount > accountBalance) return;
 
@@ -118,11 +118,9 @@ const AccountOverviewView = ({ trades, user }) => {
             const newBalance = accountBalance - amount;
             const newHistory = [...accountHistory, newEntry];
 
-            // Update Firestore
-            await updateDoc(doc(db, 'users', user.uid), {
-                accountBalance: newBalance,
-                accountHistory: arrayUnion(newEntry)
-            });
+            // Save to localStorage
+            localStorage.setItem('accountBalance', newBalance.toString());
+            localStorage.setItem('accountHistory', JSON.stringify(newHistory));
 
             setAccountBalance(newBalance);
             setAccountHistory(newHistory);
@@ -130,6 +128,7 @@ const AccountOverviewView = ({ trades, user }) => {
             setShowWithdrawalModal(false);
         } catch (error) {
             console.error('Error processing withdrawal:', error);
+            alert('Error processing withdrawal: ' + error.message);
         }
     };
 
@@ -356,8 +355,8 @@ const AccountOverviewView = ({ trades, user }) => {
 
             {/* Contribution Modal */}
             {showContributionModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
                         <h3 className="text-xl font-semibold text-white mb-4">Add Funds</h3>
                         <div className="space-y-4">
                             <div>
@@ -372,6 +371,7 @@ const AccountOverviewView = ({ trades, user }) => {
                                     placeholder="0.00"
                                     min="0"
                                     step="0.01"
+                                    autoFocus
                                 />
                             </div>
                             <div className="flex justify-end space-x-3">
@@ -399,8 +399,8 @@ const AccountOverviewView = ({ trades, user }) => {
 
             {/* Withdrawal Modal */}
             {showWithdrawalModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
                         <h3 className="text-xl font-semibold text-white mb-4">Withdraw Funds</h3>
                         <div className="space-y-4">
                             <div>
@@ -416,6 +416,7 @@ const AccountOverviewView = ({ trades, user }) => {
                                     min="0"
                                     max={accountBalance}
                                     step="0.01"
+                                    autoFocus
                                 />
                                 <p className="text-sm text-gray-400 mt-1">
                                     Available: ${accountBalance.toLocaleString()}
